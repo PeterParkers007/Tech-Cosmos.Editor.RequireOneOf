@@ -1,8 +1,8 @@
 {
   "name": "com.techcosmos.requireoneof",
   "displayName": "Require One Of",
-  "version": "1.0.0",
-  "description": "一组组件里有且仅有一个。没有就补名单第一个；再挂同组另一个会拆掉旧的。Inspector 可点选切换。不依赖其它 Tech-Cosmos 包。",
+  "version": "1.1.0",
+  "description": "一组组件里有且仅有一个。可点名具体类，或写抽象类/接口由其具体实现组成名单。点名写法补名单第一个；抽象写法按类名字母序补第一个。",
   "keywords": [
     "editor",
     "require",

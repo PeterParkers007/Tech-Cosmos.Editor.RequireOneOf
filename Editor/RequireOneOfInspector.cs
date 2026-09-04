@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 
@@ -12,7 +11,6 @@ namespace TechCosmos.RequireOneOf.Editor
         static RequireOneOfInspector()
         {
             UnityEditor.Editor.finishedDefaultHeaderGUI += DrawEditor;
-            TryHookCustomInspector();
         }
 
         public static void Draw(UnityEngine.Object obj)
@@ -43,7 +41,7 @@ namespace TechCosmos.RequireOneOf.Editor
             var attrs = (RequireOneOfAttribute[])component.GetType()
                 .GetCustomAttributes(typeof(RequireOneOfAttribute), true);
             for (int i = 0; i < attrs.Length; i++)
-                DrawGroup(component, attrs[i].Types);
+                DrawGroup(component, RequireOneOfEnforcer.Resolve(attrs[i]));
         }
 
         static void DrawGroup(Component component, Type[] types)
@@ -87,35 +85,6 @@ namespace TechCosmos.RequireOneOf.Editor
                 if (go != null)
                     RequireOneOfEnforcer.SwitchTo(go, group, to);
             };
-        }
-
-        static void TryHookCustomInspector()
-        {
-            const string typeName = "TechCosmos.Spatial2D.Unity.Editor.InspectorAboveDraw";
-            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            for (int i = 0; i < assemblies.Length; i++)
-            {
-                Type hookType;
-                try
-                {
-                    hookType = assemblies[i].GetType(typeName);
-                }
-                catch
-                {
-                    continue;
-                }
-
-                if (hookType == null)
-                    continue;
-
-                var field = hookType.GetField("Draw", BindingFlags.Public | BindingFlags.Static);
-                if (field == null || field.FieldType != typeof(Action<UnityEngine.Object>))
-                    return;
-
-                var current = (Action<UnityEngine.Object>)field.GetValue(null);
-                field.SetValue(null, current + new Action<UnityEngine.Object>(Draw));
-                return;
-            }
         }
     }
 }

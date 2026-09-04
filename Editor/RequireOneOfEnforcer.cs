@@ -65,6 +65,8 @@ namespace TechCosmos.RequireOneOf.Editor
                 return;
             if (EditorApplication.isCompiling || EditorApplication.isUpdating)
                 return;
+            if (!HasHost(go))
+                return;
 
             _busy = true;
             try
@@ -90,7 +92,7 @@ namespace TechCosmos.RequireOneOf.Editor
                 var attrs = Attrs(host.GetType());
                 for (int a = 0; a < attrs.Length; a++)
                 {
-                    var present = Collect(go, attrs[a].Types);
+                    var present = Collect(go, Resolve(attrs[a]));
                     if (present.Count <= 1)
                         continue;
 
@@ -125,12 +127,49 @@ namespace TechCosmos.RequireOneOf.Editor
                 var attrs = Attrs(host.GetType());
                 for (int a = 0; a < attrs.Length; a++)
                 {
-                    if (IndexOf(attrs[a].Types, member) >= 0)
-                        list.Add(attrs[a].Types);
+                    var types = Resolve(attrs[a]);
+                    if (IndexOf(types, member) >= 0)
+                        list.Add(types);
                 }
             }
 
             return list;
+        }
+
+        internal static Type[] Resolve(RequireOneOfAttribute attr)
+        {
+            if (attr == null || attr.Types == null || attr.Types.Length == 0)
+                return Array.Empty<Type>();
+            if (attr.FromBase)
+                return Expand(attr.Types[0]);
+            return attr.Types;
+        }
+
+        static readonly Dictionary<Type, Type[]> ExpandCache = new Dictionary<Type, Type[]>();
+
+        static Type[] Expand(Type baseType)
+        {
+            if (baseType == null)
+                return Array.Empty<Type>();
+            if (ExpandCache.TryGetValue(baseType, out var cached))
+                return cached;
+
+            var list = new List<Type>();
+            var derived = TypeCache.GetTypesDerivedFrom(baseType);
+            for (int i = 0; i < derived.Count; i++)
+            {
+                Type t = derived[i];
+                if (t == null || t.IsAbstract || t.IsInterface)
+                    continue;
+                if (!typeof(Component).IsAssignableFrom(t))
+                    continue;
+                list.Add(t);
+            }
+
+            list.Sort((a, b) => string.CompareOrdinal(a.Name, b.Name));
+            cached = list.ToArray();
+            ExpandCache[baseType] = cached;
+            return cached;
         }
 
         internal static int IndexOf(Type[] types, Component component)
@@ -217,14 +256,15 @@ namespace TechCosmos.RequireOneOf.Editor
                 var attrs = Attrs(host.GetType());
                 for (int a = 0; a < attrs.Length; a++)
                 {
-                    var types = attrs[a].Types;
+                    var types = Resolve(attrs[a]);
                     if (Collect(go, types).Count > 0)
                         continue;
 
                     Type add = FirstAddable(types);
                     if (add == null)
                         continue;
-                    Undo.AddComponent(go, add);
+                    if (Undo.AddComponent(go, add) == null)
+                        Debug.LogWarning("[RequireOneOf] 无法添加 " + add.Name + "，已跳过。", go);
                 }
             }
         }
@@ -251,6 +291,49 @@ namespace TechCosmos.RequireOneOf.Editor
             }
 
             return list;
+        }
+
+        static bool _hostTypesReady;
+        static HashSet<Type> _hostTypes;
+
+        static bool HasHost(GameObject go)
+        {
+            EnsureHostTypes();
+            if (_hostTypes.Count == 0)
+                return false;
+
+            var hosts = go.GetComponents<MonoBehaviour>();
+            for (int i = 0; i < hosts.Length; i++)
+            {
+                var host = hosts[i];
+                if (host != null && IsHostType(host.GetType()))
+                    return true;
+            }
+
+            return false;
+        }
+
+        static bool IsHostType(Type type)
+        {
+            while (type != null && type != typeof(MonoBehaviour) && type != typeof(object))
+            {
+                if (_hostTypes.Contains(type))
+                    return true;
+                type = type.BaseType;
+            }
+
+            return false;
+        }
+
+        static void EnsureHostTypes()
+        {
+            if (_hostTypesReady)
+                return;
+            _hostTypesReady = true;
+            _hostTypes = new HashSet<Type>();
+            var found = TypeCache.GetTypesWithAttribute<RequireOneOfAttribute>();
+            for (int i = 0; i < found.Count; i++)
+                _hostTypes.Add(found[i]);
         }
 
         static Type FirstAddable(Type[] types)
