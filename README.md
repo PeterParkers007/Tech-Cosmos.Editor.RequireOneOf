@@ -1,7 +1,7 @@
 # Tech-Cosmos Require One Of
 
 > **包名**：`com.techcosmos.requireoneof`  
-> **版本**：**1.1.0**  
+> **版本**：**1.2.1**  
 > **Unity**：2022.3+  
 > **依赖**：无。不引用 Spatial2D 或其它 Tech-Cosmos 包。
 
@@ -51,13 +51,6 @@ public class Unit : MonoBehaviour { }
 - 再挂同组另一个，旧的会被拆掉
 - 两个都删光，会补回默认那个
 - 可以写多组
+- 打开预制体（Prefab 编辑模式）时会扫这一份，缺的就补；不会每次编译扫全工程
 
-Inspector 里，宿主或互斥组件上会有一排点选按钮，点哪个换哪个。切换时两边**同名同类型**的序列化字段会拷过去。
-
-自定义 Editor 自己画面板时，在 `OnInspectorGUI` 开头加一行：
-
-```csharp
-RequireOneOfInspector.Draw(target);
-```
-
-然后若 `target == null` 就 return，避免切换后还去画已拆掉的组件。
+Inspector 里，宿主或互斥组件上都会有一排点选按钮（画在默认 Header 下面）。点哪个换哪个。有自定义 Editor 的组件一样有，那些包不用引用本包、不用调任何接口。切换时两边**同名同类型**的序列化字段会拷过去。

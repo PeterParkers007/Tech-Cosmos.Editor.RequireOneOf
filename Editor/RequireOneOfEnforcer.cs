@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace TechCosmos.RequireOneOf.Editor
@@ -16,6 +17,51 @@ namespace TechCosmos.RequireOneOf.Editor
         {
             ObjectFactory.componentWasAdded += OnComponentAdded;
             ObjectChangeEvents.changesPublished += OnChanges;
+            PrefabStage.prefabStageOpened += OnPrefabStageOpened;
+            EditorApplication.delayCall += EnforceOpenPrefabStage;
+        }
+
+        static void OnPrefabStageOpened(PrefabStage stage)
+        {
+            if (stage == null)
+                return;
+            var root = stage.prefabContentsRoot;
+            if (root == null)
+                return;
+            EditorApplication.delayCall += () => EnforceHierarchy(root);
+        }
+
+        static void EnforceOpenPrefabStage()
+        {
+            var stage = PrefabStageUtility.GetCurrentPrefabStage();
+            if (stage != null)
+                OnPrefabStageOpened(stage);
+        }
+
+        static void EnforceHierarchy(GameObject root)
+        {
+            if (root == null || _busy)
+                return;
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+                return;
+
+            var transforms = root.GetComponentsInChildren<Transform>(true);
+            _busy = true;
+            try
+            {
+                for (int i = 0; i < transforms.Length; i++)
+                {
+                    var go = transforms[i] != null ? transforms[i].gameObject : null;
+                    if (go == null || !HasHost(go))
+                        continue;
+                    EnforceExclusive(go, null);
+                    EnforceMissing(go);
+                }
+            }
+            finally
+            {
+                _busy = false;
+            }
         }
 
         static void OnComponentAdded(Component component)
